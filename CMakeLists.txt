@@ -26,6 +26,6 @@ message("xbtc sources: ${xbtc_sources}")
 
 add_library(xbtc STATIC ${xbtc_sources})
 
-add_executable(xbtcspv "app/spv.cpp")
+add_executable(xbtcbin "app/xbtcbin.cpp")
 target_link_libraries(xbtc boost_thread boost_system z crypto leveldb)
-target_link_libraries(xbtcspv xbtc)
+target_link_libraries(xbtcbin xbtc)
