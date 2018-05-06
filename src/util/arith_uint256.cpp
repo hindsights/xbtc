@@ -185,7 +185,7 @@ xul::big_number<BITS/8> base_uint<BITS>::to_big_number() const
 {
     xul::big_number<BITS/8> b;
     for(int x=0; x<WIDTH; ++x)
-        xul::bit_converter::little_endian().from_dword(pn[x], b.begin() + x*4);
+        xul::bit_converter::little_endian().from_dword(b.begin() + x*4, pn[x]);
     return b;
 }
 template <unsigned int BITS>
