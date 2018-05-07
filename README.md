@@ -1,7 +1,7 @@
 ### xbtc
 xbtc是bitcoin的一个简单实现，写这个程序的目的是为了学习bitcoin core代码，掌握它的实现原理和重要的技术细节。目前主要实现了BlockIndex和Block数据的下载、校验和存储，没有实现的功能有：交易创建、挖矿、本地rpc服务接口、区块数据的上传、交易的广播等。
 ### 依赖关系
-1 网络层用的是xul中基于boost.asio封装的网络框架(https://github.com/hindsights/xul)。<br>
+1 网络层用的是xul中基于boost.asio封装的网络框架，见https://github.com/hindsights/xul<br>
 2 数据库跟bitcoin core一样，用的是leveldb，格式跟bitcoin core保持一致。<br>
 3 哈希算法和签名校验用的openssl库，sip哈希用的是从bitcoin core中提取的代码。<br>
 4 序列化用的是xul中的序列化工具类。<br>
