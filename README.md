@@ -32,8 +32,9 @@ CoinDB为chainstate数据库操作类。<br>
 CoinView和BlockCache功能类似，负责Coin数据的内存存储，为系统中其他模块提供Coin的读取访问接口。（由于Coin数据比较简单，所以没有对应的CoinStorage类）<br>
 #### 网络层
 p2p应用的网络层架构比较类似，都有peer发现(PeerDiscoverer)、peer地址池(PeerPool/NodePool)、发起peer连接请求(PeerConnector/NodeConnector)、接收peer连接请求(PeerAcceptor/NodeAcceptor)、peer握手(PendingPeer/PendingNode)、peer连接(PeerConnection/Node)、管理peer连接(ConnectionManager/NodeManager)等模块和一些报文组装、解析和报文发送类。<br>
+BlockSynchronizer负责同步BlockHeader和Block数据，下载BlockHeader和Block的调度和控制逻辑都在这个类里实现。<br>
 #### 脚本解释
-bitcoin内置了一套简单的基于堆栈的脚本语言，方便自定义交易中签名和公钥的有效性。ScriptVM类负责解释执行脚本，目前只实现了一般会用到的若干个指令。<br>
+bitcoin内置了一套简单的基于堆栈的脚本语言，方便自定义交易中签名和公钥的有效性。ScriptVM类负责解释执行脚本，目前只实现了一般会用到的一些指令，其它的还有数值计算和一些不常用的堆栈操作指令，以及多重签名校验相关指令。添加指令支持比较简单，只需要实现指令对应的函数，并添加到函数调度表中跟指令码关联起来。<br>
 ### 测试环境
 MacOS Sierra<br>
 Xcode 8.0<br>
