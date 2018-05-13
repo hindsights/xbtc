@@ -19,6 +19,7 @@ public:
     int dbCache;
     uint256 minimumChainWork;
     std::string directNode;
+    bool testNet;
 };
 
 

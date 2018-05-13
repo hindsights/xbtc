@@ -49,9 +49,9 @@ public:
 
     void checkHeaderRequestTimeout()
     {
-        if (m_requestingHeaders && m_lastHeadersRequestTime.elapsed() < 5000)
+        if (m_requestingHeaders && m_lastHeadersRequestTime.elapsed() > 5000)
         {
-            if (m_headersRueqster)
+            if (m_headersRueqster && m_headersRueqster->getNodeInfo()->lastDataReceiveTime.elapsed() > 3000)
             {
                 XUL_EVENT("onTick idle header requester " << *m_headersRueqster);
                 m_requestingHeaders = false;
@@ -118,6 +118,10 @@ public:
         node->getSyncInfo().removeBlockRecord(block);
         BlockIndex* blockIndex = m_nodeManager.getAppInfo()->getBlockCache()->addBlock(block);
         XUL_EVENT("handleBlock index " << blockIndex->height << " " << *node);
+        if (blockIndex->height == 33275)
+        {
+            XUL_EVENT("handleBlock check point " << blockIndex->height << " " << *node);
+        }
         checkRequestBlocks(node);
     }
 
@@ -147,9 +151,9 @@ private:
     }
     void requestHeaders(BlockIndex* block)
     {
-        XUL_DEBUG("requestHeaders " << m_nodes.size());
         if (!m_headersRueqster)
             return;
+        XUL_DEBUG("requestHeaders " << m_nodes.size() << " " << *m_headersRueqster);
         if (block == nullptr)
         {
             block = m_nodeManager.getAppInfo()->getBlockCache()->getBestHeader();

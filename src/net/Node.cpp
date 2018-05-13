@@ -149,6 +149,7 @@ public:
 	virtual void on_socket_receive( xul::tcp_socket* sender, unsigned char* data, size_t size ) 
 	{
         XUL_DEBUG("on_socket_receive " << m_nodeInfo->socketAddress << " " << size);
+        m_nodeInfo->lastDataReceiveTime.sync();
         if (!m_nodeInfo->messageDecoder->decode(data, size))
         {
             // bad message data
@@ -172,6 +173,7 @@ public:
             assert(false);
             return;
         }
+        m_nodeInfo->lastMessageReceiveTime.sync();
         XUL_DEBUG("onMessageDecoded msg " << header.command << " " << header.length);
         auto handler = iter->second;
         uint8_t dummybuf[1];

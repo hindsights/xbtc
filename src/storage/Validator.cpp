@@ -145,7 +145,7 @@ private:
         const Transaction& tx = block->transactions[txindex];
         if (tx.isCoinBase())
             return true;
-        if (blockIndex->height == 189155)
+        if (blockIndex->height == 383)
         {
             XUL_EVENT("verifyTransactionInput checkpoint " << blockIndex->height);
         }
@@ -195,7 +195,7 @@ private:
             return false;
         }
         bool ret;
-        if (!vm.getBoolValue(0, ret) || !ret)
+        if (!vm.getBoolValue(-1, ret) || !ret)
         {
             XUL_WARN("verifyTransactionInput eval failed: " << tx.getHash() << " " << txin.previousOutput.hash
                      << " " << xul::hex_encoding::lower_case().encode(txin.signatureScript)

@@ -11,10 +11,15 @@ class ChainParams : public xul::object
 {
 public:
     boost::intrusive_ptr<Block> genesisBlock;
-    boost::intrusive_ptr<BlockIndex> genesisBlockIndex;
+    std::vector<std::string> dnsSeeds;
 
-    uint32_t blockTag;
+    uint32_t protocolMagic;
+    int defaultPort;
 };
+
+
+ChainParams* createMainChainParams();
+ChainParams* createTestNetChainParams();
 
 
 }

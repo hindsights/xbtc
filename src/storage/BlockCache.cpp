@@ -28,12 +28,11 @@ public:
     typedef std::vector<BlockIndexPtr> BlockIndexList;
     typedef std::multimap<uint256, BlockIndexPtr> UnlinkedBlockIndexChain;
 
-    explicit BlockCacheImpl(const AppConfig* config, BlockStorage* storage) : m_config(config), m_storage(storage)
+    explicit BlockCacheImpl(const AppConfig* config, BlockStorage* storage, const ChainParams* chainParams)
+        : m_config(config), m_storage(storage), m_chainParams(chainParams)
     {
         XUL_LOGGER_INIT("BlockCache");
         XUL_REL_EVENT("new");
-        m_chainParams = xul::create_object<ChainParams>();
-        m_chainParams->blockTag = 0xD9B4BEF9;
         m_chain = createBlockChain();
         m_blocks = std::make_shared<BlockIndexMap>();
         m_dirtyBlocks = std::make_shared<BlockIndexMap>();
@@ -124,13 +123,13 @@ public:
             return nullptr;
         return iter->second.get();
     }
-    virtual ChainParams* getChainParams()
+    virtual const ChainParams* getChainParams() const
     {
         return m_chainParams.get();
     }
     virtual BlockIndex* getTip()
     {
-        return m_chainParams->genesisBlockIndex.get();
+        return m_chain->getTip();
     }
     virtual BlockChain* getChain()
     {
@@ -188,14 +187,14 @@ private:
         auto iter = m_blocks->find(m_chainParams->genesisBlock->getHash());
         if (iter != m_blocks->end())
         {
-            m_chainParams->genesisBlockIndex = iter->second;
+            // m_chainParams->genesisBlockIndex = iter->second;
             m_chain->setTip(iter->second.get());
             return;
         }
         BlockIndex* block = addBlockIndex(m_chainParams->genesisBlock->header);
         updateBlockIndex(block, m_chainParams->genesisBlock.get());
         saveBlock(m_chainParams->genesisBlock.get(), block);
-        m_chainParams->genesisBlockIndex = block;
+        // m_chainParams->genesisBlockIndex = block;
         m_chain->setTip(block);
         flush();
     }
@@ -328,7 +327,7 @@ private:
     boost::intrusive_ptr<BlockStorage> m_storage;
     boost::intrusive_ptr<Validator> m_validator;
     boost::intrusive_ptr<BlockChain> m_chain;
-    boost::intrusive_ptr<ChainParams> m_chainParams;
+    boost::intrusive_ptr<const ChainParams> m_chainParams;
     BlockIndexMapPtr m_dirtyBlocks;
     xul::time_counter m_lastFlushTime;
     boost::intrusive_ptr<CoinView> m_coinView;
@@ -339,9 +338,9 @@ private:
 };
 
 
-BlockCache* createBlockCache(const AppConfig* config, BlockStorage* storage)
+BlockCache* createBlockCache(const AppConfig* config, BlockStorage* storage, const ChainParams* chainParams)
 {
-    return new BlockCacheImpl(config, storage);
+    return new BlockCacheImpl(config, storage, chainParams);
 }
 
 

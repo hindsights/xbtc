@@ -176,7 +176,7 @@ xul::data_output_stream& operator<<(xul::data_output_stream& os, const BlockHead
 
 xul::data_input_stream& operator>>(xul::data_input_stream& is, Block& block)
 {
-    return is >> block.header >> makeVarReader(block.transactions, 2000);
+    return is >> block.header >> makeVarReader(block.transactions, 50000);
 }
 
 xul::data_output_stream& operator<<(xul::data_output_stream& os, const Block& block)

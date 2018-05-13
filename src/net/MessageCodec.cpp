@@ -16,13 +16,6 @@
 namespace xbtc {
 
 
-#if 1
-const uint32_t XBTC_MAGIC = 0xD9B4BEF9;
-#else
-const uint32_t XBTC_MAGIC = 0xDAB5BFFA;
-#endif
-
-
 inline bool writeMessageCommand(xul::data_output_stream& os, const std::string& msgtype)
 {
     const int max_command_size = 12;
@@ -40,7 +33,7 @@ inline bool writeMessageCommand(xul::data_output_stream& os, const std::string& 
 class MessageEncoderImpl : public xul::object_impl<MessageEncoder>
 {
 public:
-    explicit MessageEncoderImpl()
+    explicit MessageEncoderImpl(uint32_t protocolMagic) : m_protocolMagic(protocolMagic)
     {
         XUL_LOGGER_INIT("MessageEncoder");
         XUL_DEBUG("new");
@@ -54,7 +47,7 @@ public:
     virtual int encode(const Message& msg)
     {
         xul::memory_data_output_stream os(m_buffer.data(), m_buffer.size(), false);
-        os.write_uint32(XBTC_MAGIC);
+        os.write_uint32(m_protocolMagic);
         if (!writeMessageCommand(os, msg.getMessageType()))
         {
             return -1;
@@ -79,6 +72,7 @@ public:
 protected:
     XUL_LOGGER_DEFINE();
     xul::byte_buffer m_buffer;
+    const uint32_t m_protocolMagic;
 };
 
 class CheckedMessageDecoderListener : public MessageDecoderListener
@@ -98,7 +92,7 @@ public:
 class MessageDecoderImpl : public xul::object_impl<MessageDecoder>
 {
 public:
-    MessageDecoderImpl()
+    explicit MessageDecoderImpl(uint32_t protocolMagic) : m_protocolMagic(protocolMagic)
     {
         setListener(nullptr);
     }
@@ -114,13 +108,11 @@ public:
             bufsize = m_buffer.size();
             XUL_APP_DEBUG("MessageDecoder.decode append to buffer " << xul::make_tuple(m_buffer.size(), size));
         }
-        assert(buf[0] == 0xF9);
         int processedSize = decodeMessages(buf, bufsize);
         if (processedSize < 0)
             return false;
         assert(processedSize <= bufsize);
         std::vector<uint8_t> remaining(buf + processedSize, buf + bufsize);
-        assert(remaining.empty() || remaining[0] == 0xF9);
         XUL_APP_DEBUG("MessageDecoder.decode remaining " << xul::make_tuple(m_buffer.size(), size) << " " << xul::make_tuple(processedSize, bufsize, remaining.size()));
         m_buffer.swap(remaining);
         return true;
@@ -159,7 +151,7 @@ private:
             assert(false);
             return 0;
         }
-        if (header.magic != XBTC_MAGIC)
+        if (header.magic != m_protocolMagic)
         {
             assert(false);
             is.set_bad();
@@ -188,16 +180,17 @@ private:
     xul::openssl_sha256_hasher m_hasher;
     MessageDecoderListener* m_listener;
     std::vector<uint8_t> m_buffer;
+    const uint32_t m_protocolMagic;
 };
 
-MessageEncoder* createMessageEncoder()
+MessageEncoder* createMessageEncoder(uint32_t protocolMagic)
 {
-    return new MessageEncoderImpl;
+    return new MessageEncoderImpl(protocolMagic);
 }
 
-MessageDecoder* createMessageDecoder()
+MessageDecoder* createMessageDecoder(uint32_t protocolMagic)
 {
-    return new MessageDecoderImpl;
+    return new MessageDecoderImpl(protocolMagic);
 }
 
 }

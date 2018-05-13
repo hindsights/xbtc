@@ -9,7 +9,7 @@
 
 int main(int argc, char** argv)
 {
-    printf("hello, xbitcoin binary %s\n", argv[0]);
+    printf("hello, xbitcoin binary %s %s\n", argv[0], xul::file_system::current_directory().c_str());
     xul::simple_program_options opts;
     opts.load(argc - 1, argv + 1);
     std::string confiefile = opts.get_option("--conf", "xbtc.conf");

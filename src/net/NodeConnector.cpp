@@ -72,7 +72,7 @@ public:
             node->onTick(times);
         }
 
-        schedule();
+//        schedule();
     }
     virtual void dump(xul::structured_writer* writer, int level) const
     {

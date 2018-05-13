@@ -23,14 +23,14 @@ public:
     virtual BlockIndex* addBlock(Block* block) = 0;;
     virtual BlockIndex* addBlockIndex(const BlockHeader& header) = 0;
     virtual BlockIndex* getBlockIndex(const uint256& hash) = 0;
-    virtual ChainParams* getChainParams() = 0;
-    virtual void getLocator(std::vector<uint256>& have, const BlockIndex* block) const = 0;
+    virtual const ChainParams* getChainParams() const = 0;
+    // virtual void getLocator(std::vector<uint256>& have, const BlockIndex* block) const = 0;
     virtual BlockIndex* getTip() = 0;
     virtual BlockIndex* getBestHeader() = 0;
     virtual BlockChain* getChain() = 0;
     virtual CoinView* getCoinView() = 0;
 };
 
-BlockCache* createBlockCache(const AppConfig* config, BlockStorage* storage);
+BlockCache* createBlockCache(const AppConfig* config, BlockStorage* storage, const ChainParams* chainParams);
 
 }

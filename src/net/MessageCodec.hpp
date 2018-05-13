@@ -39,8 +39,8 @@ public:
 };
 
 
-MessageEncoder* createMessageEncoder();
-MessageDecoder* createMessageDecoder();
+MessageEncoder* createMessageEncoder(uint32_t protocolMagic);
+MessageDecoder* createMessageDecoder(uint32_t protocolMagic);
 
 
 }

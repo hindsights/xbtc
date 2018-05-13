@@ -38,11 +38,11 @@ bool ScriptVM::eval(const std::string& code)
 
 const std::string* ScriptVM::getValue(int index)
 {
-    if (index < 0 || index >= stack->size())
+    if (index < -stack->size() || index >= stack->size())
     {
         return nullptr;
     }
-    return &stack->vars[index];
+    return &stack->get(index);
 }
 
 bool ScriptVM::getBoolValue(int index, bool& val)

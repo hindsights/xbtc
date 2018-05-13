@@ -21,6 +21,7 @@ class BlockCache;
 template <typename T>
 class PeerPool;
 typedef PeerPool<PeerAddress> NodePool;
+class ChainParams;
 
 class ThreadingInfo : public xul::object
 {
@@ -40,7 +41,7 @@ public:
     virtual NodePool* getNodePool() = 0;
     virtual const AppConfig* getAppConfig() const = 0;
     virtual BlockCache* getBlockCache() = 0;
-    // virtual BlockStorage* getBlockStorage() = 0;
+    virtual const ChainParams* getChainParams() const = 0;
 };
 
 

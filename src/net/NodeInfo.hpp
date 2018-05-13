@@ -24,10 +24,12 @@ public:
     xul::inet_socket_address socketAddress;
     NodeAddress nodeAddress;
     std::string userAgent;
+    xul::time_counter startTime;
+    xul::time_counter lastDataReceiveTime;
+    xul::time_counter lastMessageReceiveTime;
     bool inbound;
     bool connected;
     int version;
-    xul::time_counter start_time;
     int rtt;
 
     const PeerAddress& getPeerAddress() const { return nodeAddress.address; }

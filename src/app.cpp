@@ -46,6 +46,7 @@ public:
     boost::intrusive_ptr<const AppConfig> appConfig;
     boost::intrusive_ptr<NodePool> nodePool;
     boost::intrusive_ptr<BlockCache> blockCache;
+    boost::intrusive_ptr<const ChainParams> chainParams;
 
     AppInfoImpl()
     {
@@ -59,40 +60,8 @@ public:
     virtual NodePool* getNodePool() { return nodePool.get(); }
     virtual const AppConfig* getAppConfig() const { return appConfig.get(); }
     virtual BlockCache* getBlockCache() { return blockCache.get(); }
+    virtual const ChainParams* getChainParams() const { return chainParams.get(); }
 };
-
-static Block* createGenesisBlock(const char* timestampstr, const std::string& genesisOutputScript, uint32_t timestamp, uint32_t nonce, uint32_t bits, int32_t version, const int64_t& genesisReward)
-{
-    Transaction txNew;
-    txNew.version = 1;
-    txNew.inputs.resize(1);
-    txNew.outputs.resize(1);
-    txNew.inputs[0].signatureScript = xul::data_encoding::little_endian().encode(ScriptIntegerWriter(486604799), ScriptNumberWriter(4), ScriptStringWriter(timestampstr));
-    txNew.outputs[0].value = genesisReward;
-    txNew.outputs[0].scriptPublicKey = genesisOutputScript;
-    txNew.computeHash();
-
-    Block* genesis = createBlock();
-    BlockHeader& header = genesis->header;
-    header.timestamp = timestamp;
-    header.bits = bits;
-    header.nonce = nonce;
-    header.version = version;
-    genesis->transactions.push_back(txNew);
-    header.merkleRootHash = MerkleTree::build(genesis);
-    header.computeHash();
-    XUL_APP_DEBUG("genesis block " << header.merkleRootHash);
-    return genesis;
-}
-
-static Block* createGenesisBlock(uint32_t timestamp, uint32_t nonce, uint32_t bits, int32_t version, const int64_t& genesisReward)
-{
-    const char* timestampstr = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
-    std::string s;
-    ScriptUtils::parseHex(s, "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f");
-    std::string genesisOutputScript = xul::data_encoding::little_endian().encode(ScriptStringWriter(s), static_cast<uint8_t>(OP_CHECKSIG));
-    return createGenesisBlock(timestampstr, genesisOutputScript, timestamp, nonce, bits, version, genesisReward);
-}
 
 class BitCoinAppImpl : public xul::object_impl<BitCoinApp>, public xul::timer_listener
 {
@@ -104,7 +73,6 @@ public:
         m_appInfo = new AppInfoImpl;
         m_appInfo->threadingInfo->iosDisk = xul::create_io_service();
         m_appInfo->threadingInfo->iosMain = xul::create_io_service();
-        m_appInfo->messageEncoder = createMessageEncoder();
         m_appInfo->hostNodeInfo = createHostNodeInfo();
         m_appInfo->hostNodeInfo->userAgent = formatUserAgent(CLIENT_NAME, CLIENT_VERSION, std::vector<std::string>());
         m_appInfo->hostNodeInfo->nodeAddress.services = ServiceFlags::NODE_NETWORK;
@@ -119,9 +87,10 @@ public:
     {
         m_config = config;
         m_appInfo->appConfig = config;
+        m_appInfo->chainParams = config->testNet ? createTestNetChainParams() : createMainChainParams();
+        m_appInfo->messageEncoder = createMessageEncoder(m_appInfo->chainParams->protocolMagic);
         BlockStorage* blockStorage = createBlockStorage(m_appInfo.get());
-        m_appInfo->blockCache = createBlockCache(config, blockStorage);
-        initGenesis();
+        m_appInfo->blockCache = createBlockCache(config, blockStorage, m_appInfo->chainParams.get());
         // first load data from storage into cache, then start background io services
         m_appInfo->blockCache->load();
         m_appInfo->threadingInfo->iosMain->start();
@@ -144,10 +113,6 @@ public:
         m_nodeManager->onTick(times);
     }
 private:
-    void initGenesis()
-    {
-        m_appInfo->getBlockCache()->getChainParams()->genesisBlock = createGenesisBlock(1231006505, 2083236893, 0x1d00ffff, 1, 50 * COIN);
-    }
 
 private:
     boost::intrusive_ptr<const AppConfig> m_config;
@@ -170,6 +135,7 @@ public:
         opts.add("dataDir", &dataDir, "");
         opts.add_binary_byte_count("dbCache", &dbCache, 450, "MB");
         opts.add("directNode", &directNode, "");
+        opts.add("testNet", &testNet, false);
         // minimumChainWork = uint256::parse("000000000000000000000000000000000000000000f91c579d57cad4bc5278cc");
         minimumChainWork = uint256::parse("00000000000000000000000000000000000000000000000000000000000000cc");
     }

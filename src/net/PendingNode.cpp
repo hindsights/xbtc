@@ -9,6 +9,7 @@
 #include "AppConfig.hpp"
 #include "PeerPool.hpp"
 #include "Messages.hpp"
+#include "storage/ChainParams.hpp"
 #include "version.hpp"
 #include "flags.hpp"
 
@@ -39,7 +40,7 @@ public:
 		XUL_LOGGER_INIT("PendingNode");
 		XUL_DEBUG("new");
 		m_nodeInfo->messageSender = createMessageSender(m_nodeInfo.get(), m_appInfo->getMessageEncoder());
-		m_nodeInfo->messageDecoder = createMessageDecoder();
+		m_nodeInfo->messageDecoder = createMessageDecoder(appInfo->getChainParams()->protocolMagic);
         m_nodeInfo->messageDecoder->setListener(this);
 		m_nodeInfo->socket->set_listener(this);
 		if (!m_nodeInfo->inbound)
@@ -54,7 +55,7 @@ public:
 	virtual ~PendingNodeImpl()
 	{
 		XUL_DEBUG("delete");
-		if (!m_nodeInfo->inbound)
+		if (!m_nodeInfo->inbound && !m_nodeInfo->connected)
 		{
 			if (m_appInfo->getNodePool())
 			{
@@ -125,7 +126,7 @@ public:
 	{
 		XUL_DEBUG("on_socket_connect " << m_nodeInfo->socketAddress);
 		assert(!m_nodeInfo->inbound);
-        m_nodeInfo->rtt = m_nodeInfo->start_time.elapsed();
+        m_nodeInfo->rtt = m_nodeInfo->startTime.elapsed();
 		m_nodeInfo->socket->receive(20 * 1024);
 		XUL_DEBUG("send handshake request");
 		sendVersion();
