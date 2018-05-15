@@ -1,6 +1,6 @@
 #include "Script.hpp"
 #include "util/serialization.hpp"
-
+#include <xul/util/test_case.hpp>
 
 namespace xbtc {
 
@@ -312,6 +312,31 @@ bool ScriptUtils::parseHex(std::string& out, const char* psz)
     return true;
 }
 
+bool ScriptUtils::decodeScriptNumber(int64_t& val, const std::string& s)
+{
+    if (s.empty())
+    {
+        val = 0;
+        return true;
+    }
+
+    val = 0;
+    for (int i = 0; i < s.size(); ++i)
+    {
+        int byteval = static_cast<uint8_t>(s[i]);
+        assert(byteval >= 0);
+        if (byteval > 0)
+            val |= (byteval << (8*i));
+    }
+
+    // If the input vector's most significant byte is 0x80, remove it from
+    // the result's msb and return a negative.
+    if (s.back() & 0x80)
+        val = -((int64_t)(val & ~(0x80ULL << (8 * (s.size() - 1)))));
+
+    return true;
+}
+
 class ScriptBuilder
 {
 public:
@@ -405,6 +430,7 @@ void ScriptBuilder::pushBytes(const uint8_t* data, int size)
 
 xul::data_input_stream& operator>>(xul::data_input_stream& is, const ScriptNumberReader& reader)
 {
+    assert(false);
     return is;
 }
 xul::data_output_stream& operator<<(xul::data_output_stream& os, const ScriptIntegerWriter& writer)
@@ -466,3 +492,30 @@ xul::data_output_stream& operator<<(xul::data_output_stream& os, const ScriptStr
 
 
 }
+
+#ifdef XUL_RUN_TEST
+
+
+namespace xbtc {
+
+class ScriptNumberTestCase : public xul::test_case
+{
+public:
+    virtual void run()
+    {
+        testDecode();
+    }
+    void testDecode()
+    {
+        int64_t val;
+        assert(ScriptUtils::decodeScriptNumber(val, std::string("\x81\0", 2)) && val == 129);
+        assert(ScriptUtils::decodeScriptNumber(val, std::string("\xe4\0", 2)) && val == 228);
+        assert(ScriptUtils::decodeScriptNumber(val, std::string("\x64\0", 2)) && val == 100);
+    }
+};
+
+XUL_TEST_SUITE_REGISTRATION(ScriptNumberTestCase);
+
+}
+
+#endif

@@ -1,5 +1,6 @@
 #include "BlockStorage.hpp"
 #include "BlockIndexDB.hpp"
+#include "ChainParams.hpp"
 #include "data/Block.hpp"
 #include "AppInfo.hpp"
 #include "AppConfig.hpp"
@@ -9,7 +10,9 @@
 #include <xul/net/io_services.hpp>
 #include <xul/log/log.hpp>
 #include <xul/util/time_counter.hpp>
+#include <xul/io/data_input_stream.hpp>
 #include <xul/io/data_output_stream.hpp>
+#include <xul/io/data_encoding.hpp>
 #include <xul/io/stdfile.hpp>
 #include <xul/os/paths.hpp>
 
@@ -21,6 +24,12 @@
 namespace xbtc {
 
 
+class DummyBlockStorageListener : public BlockStorageListener
+{
+public:
+    virtual void onBlockWritten(Block* block, BlockIndex* blockIndex) {}
+};
+
 class BlockStorageImpl : public xul::object_impl<BlockStorage>
 {
 public:
@@ -30,6 +39,7 @@ public:
         XUL_REL_EVENT("new");
         m_db = createBlockIndexDB(appInfo->getAppConfig());
         m_lastBlockFile = 0;
+        setListener(nullptr);
     }
     ~BlockStorageImpl()
     {
@@ -48,6 +58,10 @@ public:
         m_lastBlockFile = data.lastBlockFile;
         return true;
     }
+    virtual void setListener(BlockStorageListener* listener)
+    {
+        m_listener = listener ? listener : &m_dummyListener;
+    }
 
     virtual DiskBlockPos writeBlock(Block* block, BlockIndex* blockIndex)
     {
@@ -60,6 +74,10 @@ public:
         m_blockFiles[pos.fileIndex].addBlock(blockIndex->height, blockIndex->header.timestamp);
         xul::io_services::post(m_appInfo->getDiskIOService(), std::bind(&BlockStorageImpl::doWriteBlock, this, s, pos));
         return pos;
+    }
+    virtual Block* readBlock(const BlockIndex* blockIndex)
+    {
+        return doReadBlock(blockIndex);
     }
     virtual void flush(const std::shared_ptr<BlockIndexesData>& data)
     {
@@ -102,10 +120,60 @@ private:
         return pos;
     }
 
+    std::string formatBlockFilePath(int fileIndex)
+    {
+        std::string filepath = xul::paths::join(m_appInfo->getAppConfig()->dataDir, xul::strings::format("blocks/blk%05u.dat", fileIndex));
+        return filepath;
+    }
+
+    Block* doReadBlock(const BlockIndex* blockIndex)
+    {
+        std::string filepath = formatBlockFilePath(blockIndex->fileIndex);
+        xul::stdfile_reader fin;
+        if (!fin.open_binary(filepath.c_str()))
+        {
+            return nullptr;
+        }
+        if (!fin.seek(blockIndex->dataPosition - 8))
+        {
+            return nullptr;
+        }
+        uint8_t buf[8];
+        size_t size = fin.read(buf, 8);
+        if (size != 8)
+        {
+            return nullptr;
+        }
+        uint32_t magic = xul::bit_converter::little_endian().to_dword(buf);
+        uint32_t blockSize = xul::bit_converter::little_endian().to_dword(buf + 4);
+        if (magic != m_appInfo->getChainParams()->protocolMagic || blockSize == 0 || blockSize > 2*1024*1024)
+        {
+            return nullptr;
+        }
+        std::string s;
+        s.resize(blockSize);
+        size = fin.read(&s[0], blockSize);
+        if (size != blockSize)
+        {
+            return nullptr;
+        }
+        Block* block = createBlock();
+        if (!xul::data_encoding::little_endian().decode(s, *block))
+        {
+            block->release_reference();
+            return nullptr;
+        }
+        block->header.computeHash();
+        for (auto& tx : block->transactions)
+        {
+            tx.computeHash();
+        }
+        return block;
+    }
     void doWriteBlock(std::shared_ptr<std::string> data, DiskBlockPos pos)
     {
         xul::stdfile_writer fout;
-        std::string filepath = xul::paths::join(m_appInfo->getAppConfig()->dataDir, xul::strings::format("blocks/blk%05u.dat", pos.fileIndex));
+        std::string filepath = formatBlockFilePath(pos.fileIndex);
         if (!fout.open_binary_writing(filepath.c_str()))
         {
             if (!fout.open_binary(filepath.c_str()))
@@ -119,7 +187,11 @@ private:
             assert(false);
             return;
         }
-        size_t size = fout.write(data->data(), data->size());
+        uint8_t buf[8];
+        xul::bit_converter::little_endian().from_dword(buf, m_appInfo->getChainParams()->protocolMagic);
+        xul::bit_converter::little_endian().from_dword(buf + 4, data->size());
+        fout.write(buf, 8);
+        size_t size = fout.write(*data);
         XUL_EVENT("doWriteBlock " << xul::make_tuple(pos.fileIndex, pos.position, size, data->size()));
         assert(size == data->size());
         fout.flush();
@@ -132,6 +204,8 @@ private:
     std::vector<BlockFileInfo> m_blockFiles;
     std::set<int> m_dirtyFiles;
     std::vector<DiskBlockPos> m_blockPositions;
+    BlockStorageListener* m_listener;
+    DummyBlockStorageListener m_dummyListener;
 };
 
 

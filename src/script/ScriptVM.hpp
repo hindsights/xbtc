@@ -2,6 +2,7 @@
 
 #include <xul/log/log.hpp>
 #include <memory>
+#include <vector>
 #include <string>
 #include <stdint.h>
 
@@ -25,8 +26,10 @@ public:
     ~ScriptVM();
     bool eval(const std::string& code);
     const std::string* getValue(int index);
+    bool getValues(std::vector<std::string>& vals, int index, int count);
     bool getBoolValue(int index, bool& val);
     bool getIntegerValue(int index, int64_t& val);
+    void verify(int errcode);
 };
 
 

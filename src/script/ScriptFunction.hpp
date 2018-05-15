@@ -39,6 +39,10 @@ public:
     {
         vars.push_back(s);
     }
+    void pushInteger(int64_t val)
+    {
+        vars.push_back(ScriptUtils::encodeScriptNumber(val));
+    }
     void push(int index)
     {
         push(get(index));

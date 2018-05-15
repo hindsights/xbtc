@@ -14,6 +14,7 @@
 #include <xul/data/date_time.hpp>
 #include <xul/util/time_counter.hpp>
 #include <xul/log/log.hpp>
+#include <xul/util/test_case.hpp>
 #include <deque>
 #include <unordered_map>
 #include <map>
@@ -22,7 +23,7 @@
 namespace xbtc {
 
 
-class BlockCacheImpl : public xul::object_impl<BlockCache>
+class BlockCacheImpl : public xul::object_impl<BlockCache>, public BlockStorageListener
 {
 public:
     typedef std::vector<BlockIndexPtr> BlockIndexList;
@@ -38,6 +39,7 @@ public:
         m_dirtyBlocks = std::make_shared<BlockIndexMap>();
         m_coinView = createCoinView(config);
         m_validator = createValidator(m_coinView.get(), config);
+        m_storage->setListener(this);
     }
     ~BlockCacheImpl()
     {
@@ -55,29 +57,56 @@ public:
         loadGenesisBlock();
         m_coinView->load();
         loadChainTip();
+#ifdef XUL_RUN_TEST
+        for (int i = 0; i < m_chain->getHeight(); ++i)
+        {
+            BlockIndex* blockIndex = m_chain->getBlock(i);
+            BlockPtr block(readBlock(blockIndex));
+            XUL_WARN("block " << blockIndex->height);
+            assert(m_blocks->find(block->header.hash) != m_blocks->end());
+            for (int j = 0; j < block->transactions.size(); ++j)
+            {
+                const Transaction& tx = block->transactions[j];
+                XUL_WARN("block tx " << blockIndex->height << " " << j << " " << tx.getHash() << " " << xul::make_tuple(tx.inputs.size(), tx.outputs.size()));
+            }
+        }
+#endif
         return true;
+    }
+    virtual void onBlockWritten(Block* block, BlockIndex* blockIndex)
+    {
+        if (!updateCoins(block, blockIndex))
+        {
+            assert(false);
+            return;
+        }
+        m_chain->setTip(blockIndex);
+        if (blockIndex->height == 91812)
+        {
+            m_block91812 = block;
+        }
+        else if (blockIndex->height == 91842)
+        {
+            m_block91842 = block;
+        }
+        m_coinView->setBestBlockHash(blockIndex->getHash(), blockIndex->height);
+    }
+    virtual Block* readBlock(BlockIndex* blockIndex)
+    {
+        return m_storage->readBlock(blockIndex);
     }
     virtual BlockIndex* addBlock(Block* block)
     {
         BlockIndex* blockIndex = addBlockIndex(block->header);
+        if (blockIndex->height <= 0)
+        {
+            assert(false);
+            return nullptr;
+        }
+        if (!m_validator->validateBlock(block, blockIndex))
+            return nullptr;
         updateBlockIndex(blockIndex, block);
         saveBlock(block, blockIndex);
-        if (blockIndex->height > 0)
-        {
-            if (!m_validator->validateBlock(block, blockIndex))
-                return nullptr;
-            m_chain->setTip(blockIndex);
-            if (blockIndex->height == 91812)
-            {
-                m_block91812 = block;
-            }
-            else if (blockIndex->height == 91842)
-            {
-                m_block91842 = block;
-            }
-            m_coinView->setBestBlockHash(blockIndex->getHash(), blockIndex->height);
-            updateCoins(block, blockIndex);
-        }
         return blockIndex;
     }
     virtual BlockIndex* addBlockIndex(const BlockHeader& header)
@@ -320,7 +349,6 @@ private:
     }
 private:
     XUL_LOGGER_DEFINE();
-    BlockIndexList m_indexes;
     BlockIndexMapPtr m_blocks;
     BlockIndexPtr m_bestHeader;
     boost::intrusive_ptr<const AppConfig> m_config;

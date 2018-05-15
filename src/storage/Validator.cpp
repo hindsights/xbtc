@@ -25,14 +25,14 @@ namespace xbtc {
 
 static const std::string SCRIPT_EMPTY;
 
-class TransactionSigChecker : public SignatureChecker
+class TransactionSignatureChecker : public SignatureChecker
 {
 public:
     const Transaction* transaction;
     int index;
     Transaction temptx;
 
-    explicit TransactionSigChecker(const Transaction* tx, int idx) : transaction(tx), index(idx)
+    explicit TransactionSignatureChecker(const Transaction* tx, int idx) : transaction(tx), index(idx)
     {
     }
     virtual bool check(const std::string& sig, const std::string& pubkey, const std::string& code)
@@ -42,7 +42,7 @@ public:
             assert(false);
             return false;
         }
-        if(pubkey.empty())
+        if (pubkey.empty())
         {
             assert(false);
             return false;
@@ -56,11 +56,19 @@ public:
         }
         std::string tempsig = sig;
         int hashType = tempsig.back();
+        assert(hashType == 1 || hashType == 0);
+        if (hashType == 0)
+        {
+            XUL_APP_REL_WARN("TransactionSignatureChecker::check hashType is zero " << transaction->getHash() << " " << index
+                << " " << xul::hex_encoding::upper_case().encode(sig)
+                << " " << xul::hex_encoding::upper_case().encode(pubkey)
+                << " " << xul::hex_encoding::upper_case().encode(code));
+        }
         tempsig.pop_back();
         uint256 sighash = hashSignature(code, hashType);
         if (!key.verify(sighash, tempsig))
         {
-            assert(false);
+//            assert(false);
             return false;
         }
         return true;
@@ -81,6 +89,12 @@ public:
     }
 
 };
+
+SignatureChecker* createSignatureChecker(const Transaction* tx, int idx)
+{
+    return new TransactionSignatureChecker(tx, idx);
+}
+
 
 class ValidatorImpl : public xul::object_impl<Validator>
 {
@@ -132,7 +146,7 @@ private:
                           << " " << xul::hex_encoding::upper_case().encode(tx.outputs[i].scriptPublicKey));
                 if (m_coinView->hasCoin(TransactionOutPoint(tx.getHash(), i)))
                 {
-                    XUL_ERROR("updateCoins invalid transaction " << tx.getHash() << " " << i);
+                    XUL_ERROR("checkDuplicateTransaction invalid transaction " << tx.getHash() << " " << xul::make_tuple(blockIndex->height, i));
                     assert(false);
                     return false;
                 }
@@ -145,14 +159,14 @@ private:
         const Transaction& tx = block->transactions[txindex];
         if (tx.isCoinBase())
             return true;
-        if (blockIndex->height == 383)
+        if (blockIndex->height == 515)
         {
             XUL_EVENT("verifyTransactionInput checkpoint " << blockIndex->height);
         }
         const TransactionInput& txin = tx.inputs[index];
         XUL_DEBUG("verifyTransactionInput " << index << " " << blockIndex->height << " " << tx.getHash()
                   << " " << txin.previousOutput.hash << " " << txin.previousOutput.index);
-        TransactionSigChecker checker(&tx, index);
+        TransactionSignatureChecker checker(&tx, index);
         ScriptVM vm(checker);
         Coin* coin = m_coinView->fetchCoin(txin.previousOutput);
         const TransactionOutput* txout = nullptr;
@@ -174,9 +188,22 @@ private:
                     break;
                 }
             }
+            for (int i = 0; i < block->transactions.size(); ++i)
+            {
+                if (i == txindex)
+                    continue;
+                const Transaction& prevtx = block->transactions[i];
+                if (prevtx.getHash() == txin.previousOutput.hash)
+                {
+                    assert(txin.previousOutput.index >= 0 && txin.previousOutput.index < prevtx.outputs.size());
+                    txout = &prevtx.outputs[txin.previousOutput.index];
+                    break;
+                }
+            }
             if (txout == nullptr)
             {
                 XUL_WARN("verifyTransactionInput no prevout " << tx.getHash() << " " << txin.previousOutput.hash << " " << txin.previousOutput.index << " " << blockIndex->height);
+                assert(false);
                 return false;
             }
         }

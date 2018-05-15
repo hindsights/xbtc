@@ -4,12 +4,14 @@
 #include <xul/lang/object_ptr.hpp>
 #include <xul/os/file_system.hpp>
 #include <xul/util/simple_program_options.hpp>
+#include <xul/util/test_case.hpp>
 #include <stdio.h>
 
 
 int main(int argc, char** argv)
 {
     printf("hello, xbitcoin binary %s %s\n", argv[0], xul::file_system::current_directory().c_str());
+    xul::run_tests();
     xul::simple_program_options opts;
     opts.load(argc - 1, argv + 1);
     std::string confiefile = opts.get_option("--conf", "xbtc.conf");

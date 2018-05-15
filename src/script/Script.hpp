@@ -12,6 +12,25 @@ class data_output_stream;
 namespace xbtc {
 
 
+// Maximum number of bytes pushable to the stack
+static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
+
+// Maximum number of non-push operations per script
+static const int MAX_OPS_PER_SCRIPT = 201;
+
+// Maximum number of public keys per multisig
+static const int MAX_PUBKEYS_PER_MULTISIG = 20;
+
+// Maximum script length in bytes
+static const int MAX_SCRIPT_SIZE = 10000;
+
+// Maximum number of values on script interpreter stack
+static const int MAX_STACK_SIZE = 1000;
+
+// Threshold for nLockTime: below this value it is interpreted as block number,
+// otherwise as UNIX timestamp.
+static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
+
 /** Script opcodes */
 enum opcodetype : uint8_t
 {
@@ -221,6 +240,8 @@ enum ScriptError
     SCRIPT_ERR_WITNESS_UNEXPECTED,
     SCRIPT_ERR_WITNESS_PUBKEYTYPE,
 
+    SCRIPT_ERR_INVALID_PARAM, 
+
     SCRIPT_ERR_ERROR_COUNT
 };
 
@@ -265,7 +286,7 @@ public:
 };
 
 xul::data_output_stream& operator<<(xul::data_output_stream& os, const ScriptIntegerWriter& writer);
-xul::data_input_stream& operator>>(xul::data_input_stream& is, const ScriptNumberReader& reader);
+// xul::data_input_stream& operator>>(xul::data_input_stream& is, const ScriptNumberReader& reader);
 xul::data_output_stream& operator<<(xul::data_output_stream& os, const ScriptNumberWriter& writer);
 xul::data_input_stream& operator>>(xul::data_input_stream& is, const ScriptStringReader& reader);
 xul::data_output_stream& operator<<(xul::data_output_stream& os, const ScriptStringWriter& writer);
@@ -275,6 +296,7 @@ class ScriptUtils
 {
 public:
     static std::string encodeScriptNumber(int64_t val);
+    static bool decodeScriptNumber(int64_t& val, const std::string& s);
     static bool parseHex(std::string& out, const char* psz);
 };
 
@@ -285,6 +307,9 @@ public:
     virtual ~SignatureChecker() {}
     virtual bool check(const std::string& sig, const std::string& pubkey, const std::string& code) = 0;
 };
+
+class Transaction;
+SignatureChecker* createSignatureChecker(const Transaction* tx, int idx);
 
 
 }
