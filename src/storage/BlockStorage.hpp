@@ -18,7 +18,7 @@ class BlockIndexesData;
 class BlockStorageListener
 {
 public:
-    virtual void onBlockWritten(Block* block, BlockIndex* blockIndex) = 0;
+    virtual void onBlockWritten(Block* block, BlockIndex* blockIndex, const DiskBlockPos& pos) = 0;
 };
 
 class BlockStorage : public xul::object

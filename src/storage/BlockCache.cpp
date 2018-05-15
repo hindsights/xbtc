@@ -54,14 +54,19 @@ public:
             return false;
         m_blocks = std::move(data.blocks);
         sortOutBlocks();
-        loadGenesisBlock();
         m_coinView->load();
+        loadGenesisBlock();
         loadChainTip();
-#ifdef XUL_RUN_TEST
-        for (int i = 0; i < m_chain->getHeight(); ++i)
+#if defined(XUL_RUN_TEST) && 0
+        for (int i = 0; i <= m_chain->getHeight(); ++i)
         {
             BlockIndex* blockIndex = m_chain->getBlock(i);
             BlockPtr block(readBlock(blockIndex));
+            if (!block)
+            {
+                assert(false);
+                break;
+            }
             XUL_WARN("block " << blockIndex->height);
             assert(m_blocks->find(block->header.hash) != m_blocks->end());
             for (int j = 0; j < block->transactions.size(); ++j)
@@ -73,14 +78,19 @@ public:
 #endif
         return true;
     }
-    virtual void onBlockWritten(Block* block, BlockIndex* blockIndex)
+    virtual void onBlockWritten(Block* block, BlockIndex* blockIndex, const DiskBlockPos& pos)
     {
+//        assert(m_chain->getHeight() == m_coinView->getBestBlockHeight());
+        blockIndex->setDiskPosition(pos);
+        blockIndex->status |= BLOCK_HAVE_DATA;
+        // check witness
+        blockIndex->raiseValidity(BlockStatus::BLOCK_VALID_TRANSACTIONS);
+        markDirtyBlock(blockIndex);
         if (!updateCoins(block, blockIndex))
         {
             assert(false);
             return;
         }
-        m_chain->setTip(blockIndex);
         if (blockIndex->height == 91812)
         {
             m_block91812 = block;
@@ -89,7 +99,7 @@ public:
         {
             m_block91842 = block;
         }
-        m_coinView->setBestBlockHash(blockIndex->getHash(), blockIndex->height);
+        assert(m_chain->getHeight() == m_coinView->getBestBlockHeight());
     }
     virtual Block* readBlock(BlockIndex* blockIndex)
     {
@@ -197,19 +207,17 @@ private:
         XUL_EVENT("loadChainTip set best block hash " << xul::make_tuple(m_blocks->size(), m_chain->getHeight(), iter->second->height) << " " << bestBlockHash);
         return true;
     }
-    bool updateCoins(const Block* block, const BlockIndex* blockIndex)
+    bool updateCoins(const Block* block, BlockIndex* blockIndex)
     {
         if (!m_validator->verifyTransactions(block, blockIndex))
             return false;
+        m_chain->setTip(blockIndex);
+        m_coinView->setBestBlockHash(blockIndex->getHash(), blockIndex->height);
         for (auto tx : block->transactions)
         {
-            updateCoins(&tx, blockIndex);
+            m_coinView->transfer(&tx, blockIndex->height);
         }
         return true;
-    }
-    void updateCoins(const Transaction* tx, const BlockIndex* blockIndex)
-    {
-        m_coinView->transfer(tx, blockIndex->height);
     }
     void loadGenesisBlock()
     {
@@ -234,12 +242,7 @@ private:
     }
     void saveBlock(Block* block, BlockIndex* blockIndex)
     {
-        DiskBlockPos pos = m_storage->writeBlock(block, blockIndex);
-        blockIndex->setDiskPosition(pos);
-        blockIndex->status |= BLOCK_HAVE_DATA;
-        // check witness
-        blockIndex->raiseValidity(BlockStatus::BLOCK_VALID_TRANSACTIONS);
-        markDirtyBlock(blockIndex);
+        m_storage->writeBlock(block, blockIndex);
     }
     void markDirtyBlock(BlockIndex* block)
     {
@@ -260,6 +263,7 @@ private:
         data->blocks = std::move(m_dirtyBlocks);
         m_dirtyBlocks = std::make_shared<BlockIndexMap>();
         m_storage->flush(data);
+        m_coinView->flush();
     }
     void updatePreviousBlock()
     {

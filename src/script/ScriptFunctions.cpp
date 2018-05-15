@@ -1,5 +1,6 @@
 #include "ScriptVM.hpp"
 #include "ScriptFunction.hpp"
+#include "Script.hpp"
 #include "util/Hasher.hpp"
 
 #include <xul/io/data_input_stream.hpp>
@@ -130,7 +131,7 @@ public:
 
 void script_reserved(ScriptVM* vm, uint8_t opcode, xul::data_input_stream& code)
 {
-    XUL_WARN(vm, "script_reserved " << xul::strings::format("opcode=0x%02X", opcode));
+    XUL_WARN(vm, "script_reserved " << xul::strings::format("opcode=0x%02X", opcode) << " " << getOpName(static_cast<opcodetype>(opcode)));
     assert(false);
 }
 
@@ -209,6 +210,7 @@ void script_numericUnaryOp(ScriptVM* vm, uint8_t opcode, xul::data_input_stream&
     int64_t val;
     VM_CHECK_PARAM(vm, vm->getIntegerValue(-1, val));
     assert(opIndex >= 0 && opIndex < UnaryNumberOps::instance().functions.size());
+    vm->stack->pop();
     vm->stack->pushInteger(UnaryNumberOps::instance().functions[opIndex](val));
 }
 
@@ -221,6 +223,7 @@ void script_numericBinaryOp(ScriptVM* vm, uint8_t opcode, xul::data_input_stream
     VM_CHECK_PARAM(vm, vm->getIntegerValue(-2, x));
     VM_CHECK_PARAM(vm, vm->getIntegerValue(-1, y));
     assert(opIndex >= 0 && opIndex < BinaryNumberOps::instance().functions.size());
+    vm->stack->pop(2);
     vm->stack->pushInteger(BinaryNumberOps::instance().functions[opIndex](x, y));
     if (opcode == OP_NUMEQUALVERIFY)
     {
@@ -266,6 +269,16 @@ void script_drop2(ScriptVM* vm, uint8_t opcode, xul::data_input_stream& code)
 {
     VM_CHECK_PARAM_COUNT(vm, 2);
     vm->stack->pop(2);
+}
+
+void script_depth(ScriptVM* vm, uint8_t opcode, xul::data_input_stream& code)
+{
+    vm->stack->pushInteger(vm->stack->size());
+}
+void script_size(ScriptVM* vm, uint8_t opcode, xul::data_input_stream& code)
+{
+    VM_CHECK_PARAM_COUNT(vm, 1);
+    vm->stack->pushInteger(vm->stack->get(-1).size());
 }
 
 void script_return(ScriptVM* vm, uint8_t opcode, xul::data_input_stream& code)
@@ -346,7 +359,6 @@ void script_checkMultiSig(ScriptVM* vm, uint8_t opcode, xul::data_input_stream& 
     {
         vm->verify(SCRIPT_ERR_CHECKMULTISIGVERIFY);
     }
-    return;
 }
 
 
@@ -376,6 +388,8 @@ ScriptFunctionTable::ScriptFunctionTable()
     functions[OP_3DUP] = script_dup3;
     functions[OP_DROP] = script_drop;
     functions[OP_2DROP] = script_drop2;
+    functions[OP_DEPTH] = script_depth;
+    functions[OP_SIZE] = script_size;
 
     for (int i = OP_1ADD; i <= OP_0NOTEQUAL; ++i)
         functions[i] = script_numericUnaryOp;

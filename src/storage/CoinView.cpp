@@ -48,6 +48,10 @@ public:
     {
         return m_coinsData.bestBlockHash;
     }
+    virtual int getBestBlockHeight() const
+    {
+        return m_coinsData.bestBlockHeight;
+    }
     virtual void setBestBlockHash(const uint256& hash, int height)
     {
         m_coinsData.bestBlockHash = hash;
@@ -92,7 +96,6 @@ public:
         {
             assert(inputval >= outputval);
         }
-        flush();
     }
     virtual Coin* fetchCoin(const TransactionOutPoint& out)
     {
@@ -112,21 +115,34 @@ public:
             return &entry.coin;
         }
         assert(tempcoin.output.value > 0);
+        assert(tempcoin.height <= m_coinsData.bestBlockHeight || m_coinsData.bestBlockHeight == 0);
         entry.coin = tempcoin;
         return &entry.coin;
     }
-private:
-    void flush()
+    bool flush()
     {
-        if (m_lastFlushTime.elapsed() < 5000)
-            return;
+        // if (m_lastFlushTime.elapsed() < 5000)
+        //     return;
         m_lastFlushTime.sync();
-        m_db->writeCoins(m_coinsData);
+        for (const auto& item : m_coinsData.addedCoins)
+        {
+            assert(item.second.coin.height <= m_coinsData.bestBlockHeight || item.second.coin.height == m_coinsData.bestBlockHeight + 1);
+        }
+        bool success = m_db->writeCoins(m_coinsData);
+        if (!success)
+        {
+            XUL_WARN("failed to flush coins " << xul::make_tuple(m_coinsData.addedCoins.size(), m_coinsData.removedCoins.size()));
+            assert(false);
+            return false;
+        }
         m_coinsData.addedCoins.clear();
         m_coinsData.removedCoins.clear();
+        return true;
     }
+private:
     void addCoin(const TransactionOutPoint& out, const Coin& coin)
     {
+        assert(coin.height <= m_coinsData.bestBlockHeight);
         // if (m_coinsData.addedCoins.find(out) != m_coinsData.addedCoins.end())
         // {
         //     auto iter = m_coinsData.addedCoins.find(out);

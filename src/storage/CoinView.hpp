@@ -21,7 +21,9 @@ class CoinView : public xul::object
 {
 public:
     virtual bool load() = 0;
+    virtual bool flush() = 0;
     virtual const uint256& getBestBlockHash() const = 0;
+    virtual int getBestBlockHeight() const = 0;
     virtual void setBestBlockHash(const uint256& hash, int height) = 0;
     virtual void transfer(const Transaction* tx, int height) = 0;
     virtual bool hasCoin(const TransactionOutPoint& out) = 0;

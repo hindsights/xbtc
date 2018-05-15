@@ -27,7 +27,7 @@ xul::data_output_stream& operator<<(xul::data_output_stream& os, const Coin& coi
 {
     assert(coin.height >= 0);
     uint32_t val = static_cast<uint32_t>(coin.height);
-    val <<= 2;
+    val <<= 1;
     if (coin.isCoinBase)
     {
         val++;

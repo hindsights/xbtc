@@ -62,22 +62,29 @@ public:
     }
     virtual void loadAll(CoinsData& data)
     {
-        boost::intrusive_ptr<DBIterator> cursor = m_db->createIterator();
-        if (0)
-        {
-            cursor->seekToFirst();
-            while (true && cursor->valid())
-            {
-                std::string key = cursor->getKey();
-                xul::slice value = cursor->getValue();
-                XUL_DEBUG("loadAll key=" << xul::hex_encoding::lower_case().encode(key) << " " << value.size());
-                cursor->next();
-            }
-        }
         uint256 bestBlockHash;
         if (m_db->read(DB_BEST_BLOCK, bestBlockHash))
         {
             data.bestBlockHash = bestBlockHash;
+        }
+        if (bestBlockHash.is_null())
+        {
+            boost::intrusive_ptr<DBIterator> cursor = m_db->createIterator();
+            cursor->seekToFirst();
+            while (cursor->valid())
+            {
+                std::string key = cursor->getKey();
+                xul::slice value = cursor->getValue();
+                XUL_DEBUG("loadAll key=" << xul::hex_encoding::lower_case().encode(key) << " " << value.size());
+                if (key[0] == DB_COIN)
+                {
+                    Coin coin;
+                    bool success = xul::data_encoding::little_endian().decode(value.data(), value.size(), coin);
+                    assert(success);
+                    assert(coin.height <= 0);
+                }
+                cursor->next();
+            }
         }
     }
     virtual bool writeCoins(const CoinsData& data)
@@ -87,7 +94,7 @@ public:
         {
             const TransactionOutPoint& out = item.first;
             const Coin& coin = item.second.coin;
-            if (coin.output.value > 0)
+            if (coin.output.value > 0 && item.second.dirty)
             {
                 batch.write(m_dataEncoding.encode(DB_COIN, out.hash, out.index), coin);
             }

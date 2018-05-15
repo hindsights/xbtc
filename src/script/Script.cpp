@@ -271,23 +271,17 @@ std::string ScriptUtils::encodeScriptNumber(int64_t val)
 
     const bool neg = val < 0;
     uint64_t absvalue = neg ? -val : val;
-    bool msb = false;
     while (absvalue)
     {
-        uint8_t bytevalue = static_cast<uint8_t>(absvalue) & 0xff;
+        uint8_t bytevalue = static_cast<uint8_t>(absvalue & 0xff);
         absvalue >>= 8;
-        if (absvalue == 0)
-        {
-            msb = ((bytevalue & 0x80) != 0);
-            if (neg && !msb)
-            {
-                bytevalue |= 0x80;
-            }
-        }
         s.push_back(bytevalue);
     }
-    if (msb)
+    uint8_t lastByte = static_cast<uint8_t>(s.back());
+    if (lastByte & 0x80)
         s.push_back(neg ? 0x80 : 0);
+    else if (neg)
+        s.back() = (lastByte | 0x80);
     return s;
 }
 
@@ -320,19 +314,25 @@ bool ScriptUtils::decodeScriptNumber(int64_t& val, const std::string& s)
         return true;
     }
 
-    val = 0;
+    uint64_t tempval = 0;
     for (int i = 0; i < s.size(); ++i)
     {
-        int byteval = static_cast<uint8_t>(s[i]);
+        uint64_t byteval = static_cast<uint8_t>(s[i]);
         assert(byteval >= 0);
         if (byteval > 0)
-            val |= (byteval << (8*i));
+            tempval |= (byteval << (8*i));
     }
 
     // If the input vector's most significant byte is 0x80, remove it from
     // the result's msb and return a negative.
-    if (s.back() & 0x80)
-        val = -((int64_t)(val & ~(0x80ULL << (8 * (s.size() - 1)))));
+    uint8_t lastByte = s.back();
+    if (lastByte & 0x80)
+        val = -((int64_t)(tempval & ~(0x80ULL << (8 * (s.size() - 1)))));
+    else
+    {
+        assert(tempval <= INT64_MAX);
+        val = static_cast<int64_t>(tempval);
+    }
 
     return true;
 }
@@ -503,14 +503,22 @@ class ScriptNumberTestCase : public xul::test_case
 public:
     virtual void run()
     {
-        testDecode();
+        testDecode1();
+        testDecode2();
     }
-    void testDecode()
+    void testDecode1()
     {
         int64_t val;
-        assert(ScriptUtils::decodeScriptNumber(val, std::string("\x81\0", 2)) && val == 129);
-        assert(ScriptUtils::decodeScriptNumber(val, std::string("\xe4\0", 2)) && val == 228);
-        assert(ScriptUtils::decodeScriptNumber(val, std::string("\x64\0", 2)) && val == 100);
+        assert(ScriptUtils::decodeScriptNumber(val, std::string("\x81", 1)) && val == -1);
+        assert(ScriptUtils::decodeScriptNumber(val, std::string("\xe4", 1)) && val == -100);
+        assert(ScriptUtils::decodeScriptNumber(val, std::string("\x64", 1)) && val == 100);
+    }
+    void testDecode2()
+    {
+        int64_t val;
+        assert(ScriptUtils::decodeScriptNumber(val, std::string()) && val == 0);
+        assert(ScriptUtils::decodeScriptNumber(val, std::string("\xFF\xFF\xFF\xFF", 4)) && val == -0x7fffffffULL);
+        assert(ScriptUtils::decodeScriptNumber(val, std::string("\xFF\xFF\xFF\x7F", 4)) && val == 0x7fffffffULL);
     }
 };
 

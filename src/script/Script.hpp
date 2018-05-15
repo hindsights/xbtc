@@ -180,7 +180,7 @@ enum opcodetype : uint8_t
 
 const unsigned int MAX_OPCODE = OP_NOP10;
 
-const char* gGetOpName(opcodetype opcode);
+const char* getOpName(opcodetype opcode);
 
 enum ScriptError
 {

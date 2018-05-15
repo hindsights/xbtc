@@ -27,7 +27,7 @@ namespace xbtc {
 class DummyBlockStorageListener : public BlockStorageListener
 {
 public:
-    virtual void onBlockWritten(Block* block, BlockIndex* blockIndex) {}
+    virtual void onBlockWritten(Block* block, BlockIndex* blockIndex, const DiskBlockPos& pos) {}
 };
 
 class BlockStorageImpl : public xul::object_impl<BlockStorage>
@@ -72,7 +72,7 @@ public:
         s->resize(os.position());
         DiskBlockPos pos = findBlockPos(0, s->size() + 8);
         m_blockFiles[pos.fileIndex].addBlock(blockIndex->height, blockIndex->header.timestamp);
-        xul::io_services::post(m_appInfo->getDiskIOService(), std::bind(&BlockStorageImpl::doWriteBlock, this, s, pos));
+        xul::io_services::post(m_appInfo->getDiskIOService(), std::bind(&BlockStorageImpl::doWriteBlock, this, s, pos, BlockPtr(block), BlockIndexPtr(blockIndex)));
         return pos;
     }
     virtual Block* readBlock(const BlockIndex* blockIndex)
@@ -134,6 +134,7 @@ private:
         {
             return nullptr;
         }
+        assert(blockIndex->dataPosition >= 8);
         if (!fin.seek(blockIndex->dataPosition - 8))
         {
             return nullptr;
@@ -170,7 +171,7 @@ private:
         }
         return block;
     }
-    void doWriteBlock(std::shared_ptr<std::string> data, DiskBlockPos pos)
+    void doWriteBlock(std::shared_ptr<std::string> data, DiskBlockPos pos, BlockPtr block, BlockIndexPtr blockIndex)
     {
         xul::stdfile_writer fout;
         std::string filepath = formatBlockFilePath(pos.fileIndex);
@@ -195,6 +196,11 @@ private:
         XUL_EVENT("doWriteBlock " << xul::make_tuple(pos.fileIndex, pos.position, size, data->size()));
         assert(size == data->size());
         fout.flush();
+        xul::io_services::post(m_appInfo->getDiskIOService(), std::bind(&BlockStorageImpl::signalBlockWritten, this, pos, block, blockIndex));
+    }
+    void signalBlockWritten(DiskBlockPos pos, BlockPtr block, BlockIndexPtr blockIndex)
+    {
+        m_listener->onBlockWritten(block.get(), blockIndex.get(), pos);
     }
 private:
     XUL_LOGGER_DEFINE();
