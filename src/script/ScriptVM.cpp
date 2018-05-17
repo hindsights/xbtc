@@ -56,7 +56,7 @@ bool ScriptVM::getValues(std::vector<std::string>& vals, int index, int count)
         return false;
     for (int i = 0; i < count; ++i)
     {
-        vals.push_back(stack->get(index - i));
+        vals.push_back(stack->get(index >= 0 ? index + i : index - i));
     }
     return true;
 }

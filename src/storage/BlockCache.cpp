@@ -73,6 +73,10 @@ public:
             {
                 const Transaction& tx = block->transactions[j];
                 XUL_WARN("block tx " << blockIndex->height << " " << j << " " << tx.getHash() << " " << xul::make_tuple(tx.inputs.size(), tx.outputs.size()));
+                if (!tx.isCoinBase())
+                {
+                    XUL_WARN("block tx real " << blockIndex->height << " " << j << " " << tx.getHash() << " " << xul::make_tuple(tx.inputs.size(), tx.outputs.size()));
+                }
             }
         }
 #endif

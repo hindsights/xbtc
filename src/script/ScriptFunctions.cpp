@@ -318,22 +318,22 @@ void script_checkSig(ScriptVM* vm, uint8_t opcode, xul::data_input_stream& code)
 
 bool checkMultiSig(ScriptVM* vm, const std::vector<std::string>& pubkeys, const std::vector<std::string>& signatures)
 {
-    int i = 0;
+    int usedPubkey = 0;
+    int passed = 0;
     for (const auto& sig : signatures)
     {
-        for (const auto& pubkey : pubkeys)
+        while (usedPubkey < pubkeys.size())
         {
+            const std::string& pubkey = pubkeys[usedPubkey++];
             if (vm->env->checker.check(sig, pubkey, vm->env->code))
+            {
+                ++passed;
                 break;
+            }
         }
-        const std::string& pubkey = pubkeys[i++];
-        if (vm->env->checker.check(sig, pubkey, vm->env->code))
-            continue;
-        if (i >= pubkeys.size())
-            return false;
     }
-    assert(false);
-    return true;
+    assert(passed <= signatures.size());
+    return passed >= signatures.size();
 }
 void script_checkMultiSig(ScriptVM* vm, uint8_t opcode, xul::data_input_stream& code)
 {
